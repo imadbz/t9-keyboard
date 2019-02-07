@@ -1,17 +1,13 @@
 import english from "an-array-of-english-words";
+import SortedSet from "./sortedSet";
 
-const englishSortedObj = english.reduce((acc, word) => {
-  if (!acc[word.length]) acc[word.length] = [];
-  !acc[word.length].push(word);
-
-  return acc;
-}, {});
-
-Object.keys(englishSortedObj).forEach(key => {
-  englishSortedObj[key] = englishSortedObj[key].sort();
-});
+const sortedEnglish = new SortedSet();
+sortedEnglish.add(english);
 
 // Filter a list of words, output only english ones
 export const OnlyEnglishWords = arr => {
-  return arr.filter(word => -1 !== englishSortedObj[word.length].indexOf(word));
+  const listOfWords = new SortedSet();
+  listOfWords.add(arr);
+
+  return sortedEnglish.intersect(listOfWords);
 };
