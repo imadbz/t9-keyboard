@@ -1,38 +1,150 @@
 import React, { Component } from "react";
 import "./App.css";
 
+const keyMap = [
+  ["a", "b", "c", "2"],
+  ["d", "e", "f", "3"],
+  ["g", "h", "i", "4"],
+  ["j", "k", "l", "5"],
+  ["m", "n", "o", "6"],
+  ["p", "q", "r", "s", "7"],
+  ["t", "u", "v", "8"],
+  ["w", "x", "y", "z", "9"]
+];
+
+const indexOfAinB = (A, B) =>
+  A.length > 0 && B.length > 0 && B.toLowerCase().indexOf(A.toLowerCase());
+
 class App extends React.Component {
   state = {
     lastKeyTimestamp: null,
     sameKeyRepetition: 0,
-    text: "Hello Wo",
+    text: "",
     t9Keys: {},
-    suggestions: ["World", "Workraft", "Microft", "Microsoft", "Halooligan"]
+    suggestions: [],
+    onlyEnglishWords: true
   };
 
-  onSuggestionSelect = word => {
-    const { text } = this.state;
+  componentDidUpdate(prevProps, prevState) {
+    if (prevState.text !== this.state.text) this.suggest();
+  }
 
-    const confirmedText = text.slice(0, text.lastIndexOf(" "));
-    this.setState({ text: confirmedText + " " + word + " " });
+  // call backend to suggest words
+  backendApiCall = async keys => {
+    try {
+      // fetch
+      const suggestionsResponse = await fetch(
+        "http://localhost:8080/api/suggestions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            keys: keys,
+            onlyEnglish: this.state.onlyEnglishWords
+          })
+        }
+      );
+
+      //handle non success states
+      if (suggestionsResponse.status >= 400)
+        throw new Error(
+          suggestionsResponse.status,
+          await suggestionsResponse.text()
+        );
+
+      //update state
+      const suggestions = (await suggestionsResponse.json()).suggestions || [];
+      return suggestions;
+    } catch (ex) {
+      console.log("couldn't fetch suggestions", ex);
+      return [];
+    }
   };
 
-  append = c =>
-    this.setState(state => {
-      return { text: (state.text + c).replace(/\s+/g, " ") };
+  suggest = async () => {
+    let lastWord = this.state.text.split(" ").pop() || "";
+
+    // clear suggestions on empty
+    if (!lastWord)
+      return {
+        suggestions: [],
+        t9Keys: {}
+      };
+
+    // construct list of keys from last word
+    const t9Keys = lastWord.split("").reduce((acc, c) => {
+      const key = keyMap.find(key => key.indexOf(c) > -1) || null;
+      if (key) acc[Object.keys(acc).length] = key;
+      return acc;
+    }, {});
+
+    const lastPressedKeystamp = this.state.lastKeyTimestamp;
+
+    const suggestions = await this.backendApiCall(t9Keys);
+
+    // if train moved just discard!
+    if (this.state.lastKeyTimestamp !== lastPressedKeystamp) return;
+
+    // replace last digits from the available suggestion if possible
+    const selectedSuggestion = suggestions.length > 0 && suggestions[0];
+
+    // if (
+    //   (lastWord.length == 1 ||
+    //     indexOfAinB(
+    //       lastWord.substr(0, lastWord.length - 1),
+    //       selectedSuggestion
+    //     ) > -1) &&
+    //   "23456789".indexOf(lastWord.split("").pop()) !== -1
+    // ) {
+    //   const digit = lastWord.split("").pop();
+    //   const temp = lastWord.substr(0, lastWord.length - 1);
+    //   const letterFromSuggestion = selectedSuggestion.substr(
+    //     selectedSuggestion.indexOf(temp) + temp.length,
+    //     1
+    //   );
+    //   if (
+    //     keyMap.find(k => k.indexOf(digit) > -1) ===
+    //     keyMap.find(k => k.indexOf(letterFromSuggestion) > -1)
+    //   )
+    //     lastWord = temp + letterFromSuggestion;
+
+    //   console.log(
+    //     digit,
+    //     temp,
+    //     letterFromSuggestion,
+    //     selectedSuggestion,
+    //     selectedSuggestion.indexOf(temp),
+    //     selectedSuggestion.substring(
+    //       selectedSuggestion.indexOf(temp) + temp.length,
+    //       1
+    //     )
+    //   );
+    // }
+
+    selectedSuggestion && this.append(selectedSuggestion, false, true);
+
+    this.setState({
+      t9Keys: t9Keys,
+      suggestions: suggestions
     });
-
-  replaceLastChar = c =>
-    this.setState(state => ({
-      text: state.text.slice(0, state.text.length - 1) + c
-    }));
-
-  suggest = t9Keys => {
-    console.log(t9Keys);
-    // this.setState({});
   };
 
-  onKey = (keyObject, keyboardMode, majuscule = false) => {
+  // append string to text
+  append = (str, replaceLastChar, replaceLastWord) => {
+    this.setState(state => {
+      let text = state.text;
+      if (replaceLastChar) text = state.text.substr(0, state.text.length - 1);
+      if (replaceLastWord) text = text.substr(0, text.lastIndexOf(" ")) + " ";
+      text = (text + str).replace(/\s+/g, " ");
+
+      return { text: text };
+    });
+  };
+
+  // Handle keyboard input
+  onKey = (keyObject, keyboardMode, maj = false) => {
     this.setState(state => {
       const isSameAsPreviousKey =
         keyboardMode === "ABC" &&
@@ -51,14 +163,10 @@ class App extends React.Component {
     if (keyObject.action) {
       switch (keyObject.action) {
         case "trash":
-          this.setState({ text: "", t9Keys: {} });
+          this.setState({ text: "" });
           break;
         case "delete":
-          this.setState(state => {
-            const t9Keys = Object.assign({}, state.t9Keys);
-            t9Keys[text.length - 1] && delete t9Keys[text.length - 1];
-            return { text: text.slice(0, text.length - 1), t9Keys: t9Keys };
-          });
+          this.setState({ text: text.slice(0, text.length - 1) });
           break;
         case "copy":
           //this.state.text
@@ -74,49 +182,26 @@ class App extends React.Component {
     }
 
     if (keyObject.alpha == " " || keyObject.alpha === "\n") {
-      this.setState(state => {
-        this.append(keyObject.alpha);
-        return {
-          t9Keys: {},
-          suggestions: []
-        };
-      });
+      this.append(keyObject.alpha);
       return;
     }
-
-    const suggestionCombination = [];
 
     if (keyboardMode === "ABC" || keyObject.num === 1) {
       this.setState(state => {
         const character = keyObject.alpha[state.sameKeyRepetition];
 
         const toInsert =
-          (majuscule && character.toUpperCase()) || character || keyObject.num;
+          (maj && character.toUpperCase()) || character || keyObject.num;
 
-        suggestionCombination.push(toInsert);
-
-        state.sameKeyRepetition > 0
-          ? this.replaceLastChar(toInsert)
-          : this.append(toInsert);
+        this.append(toInsert, state.sameKeyRepetition > 0);
       });
     } else if (keyboardMode === "T9") {
-      const possibleChars = keyObject.alpha.split("");
-      possibleChars.push(keyObject.num);
-
-      suggestionCombination.push(possibleChars);
+      this.append(keyObject.num);
     }
+  };
 
-    // suggest
-    this.setState(state => {
-      const t9Keys = Object.assign({}, state.t9Keys, {
-        [state.text.length]: suggestionCombination
-      });
-      this.suggest(t9Keys);
-
-      return {
-        t9Keys: t9Keys
-      };
-    });
+  onSuggestionSelect = word => {
+    this.append(word + " ", false, true);
   };
 
   render() {
@@ -140,17 +225,19 @@ class App extends React.Component {
 class DisplayText extends React.Component {
   render() {
     const { text, suggestion } = this.props;
-    const lastWord = text.split(" ").pop() || "";
+    let lastWord = text.split(" ").pop() || "";
 
-    const shouldHighlight =
-      lastWord.length > 0 &&
-      suggestion.length > 0 &&
-      suggestion.toLowerCase().indexOf(lastWord.toLowerCase()) > -1;
-    const confirmedText = shouldHighlight
-      ? (text.lastIndexOf(" ") > 0 && text.slice(0, text.lastIndexOf(" "))) ||
-        ""
-      : text;
+    // handle highlighting in text
+    const shouldHighlight = indexOfAinB(lastWord, suggestion) > -1;
+
+    const confirmedText =
+      ((text.lastIndexOf(" ") > 0 && text.slice(0, text.lastIndexOf(" "))) ||
+        "") +
+      " " +
+      (shouldHighlight ? "" : lastWord);
+
     const highlighted = (shouldHighlight && lastWord) || "";
+
     const complement =
       (shouldHighlight &&
         suggestion.slice(
@@ -178,18 +265,13 @@ class DisplayText extends React.Component {
 }
 
 class Suggestions extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      words: ["World", "Workraft", "Microft", "Microsoft", "Halooligan"]
-    };
-  }
   render() {
-    const { onSuggestionSelect } = this.props;
+    const { suggestions, onSuggestionSelect } = this.props;
     return (
       <div class="suggestions noselect">
-        {this.state.words.map((w, i) => (
+        {suggestions.map((w, i) => (
           <span
+            key={i}
             class={"suggest-word " + (i == 0 ? "suggest-word-selected" : "")}
             onClick={e => {
               onSuggestionSelect(e.target.innerText);
@@ -248,7 +330,7 @@ class Keyboard extends React.Component {
       }
     },
     mode: "T9", // t9 / ABC / 123
-    maj: false
+    maj: true
   };
 
   buttonClicked = key => {

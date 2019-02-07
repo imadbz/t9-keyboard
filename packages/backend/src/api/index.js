@@ -5,7 +5,7 @@ import suggestions from "./suggestions";
 export default ({ config }) => {
   let api = Router();
 
-  api.get("/suggestions", suggestions);
+  api.post("/suggestions", suggestions);
 
   api.get("/", (req, res) => {
     res.json({ version });

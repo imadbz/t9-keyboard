@@ -22,10 +22,11 @@ export default (req, res) => {
   const { keys, onlyEnglish } = req.body;
 
   const keysList = Object.keys(keys).map(key => keys[key]);
-  console.log(req.body, keysList);
 
   let possibleCombs = AllPossibleCombinations(keysList);
   if (onlyEnglish) possibleCombs = OnlyEnglishWords(possibleCombs);
+
+  console.log(req.body, keysList, possibleCombs);
 
   res.json({
     suggestions: possibleCombs
