@@ -90,39 +90,6 @@ class App extends React.Component {
     // replace last digits from the available suggestion if possible
     const selectedSuggestion = suggestions.length > 0 && suggestions[0];
 
-    // if (
-    //   (lastWord.length == 1 ||
-    //     indexOfAinB(
-    //       lastWord.substr(0, lastWord.length - 1),
-    //       selectedSuggestion
-    //     ) > -1) &&
-    //   "23456789".indexOf(lastWord.split("").pop()) !== -1
-    // ) {
-    //   const digit = lastWord.split("").pop();
-    //   const temp = lastWord.substr(0, lastWord.length - 1);
-    //   const letterFromSuggestion = selectedSuggestion.substr(
-    //     selectedSuggestion.indexOf(temp) + temp.length,
-    //     1
-    //   );
-    //   if (
-    //     keyMap.find(k => k.indexOf(digit) > -1) ===
-    //     keyMap.find(k => k.indexOf(letterFromSuggestion) > -1)
-    //   )
-    //     lastWord = temp + letterFromSuggestion;
-
-    //   console.log(
-    //     digit,
-    //     temp,
-    //     letterFromSuggestion,
-    //     selectedSuggestion,
-    //     selectedSuggestion.indexOf(temp),
-    //     selectedSuggestion.substring(
-    //       selectedSuggestion.indexOf(temp) + temp.length,
-    //       1
-    //     )
-    //   );
-    // }
-
     selectedSuggestion && this.append(selectedSuggestion, false, true);
 
     this.setState({
