@@ -1,4 +1,5 @@
 import React, { Component } from "react";
+import copy from "copy-text-to-clipboard";
 import "./App.css";
 
 const keyMap = [
@@ -17,9 +18,11 @@ const indexOfAinB = (A, B) =>
 
 class App extends React.Component {
   state = {
+    lastKeyObject: null,
     lastKeyTimestamp: null,
     sameKeyRepetition: 0,
     text: "",
+    mode: "T9", // t9 / ABC / 123
     t9Keys: {},
     suggestions: [],
     onlyEnglishWords: true
@@ -67,11 +70,13 @@ class App extends React.Component {
     let lastWord = this.state.text.split(" ").pop() || "";
 
     // clear suggestions on empty
-    if (!lastWord)
-      return {
+    if (!lastWord) {
+      this.setState({
         suggestions: [],
         t9Keys: {}
-      };
+      });
+      return;
+    }
 
     // construct list of keys from last word
     const t9Keys = lastWord.split("").reduce((acc, c) => {
@@ -87,14 +92,18 @@ class App extends React.Component {
     // if train moved just discard!
     if (this.state.lastKeyTimestamp !== lastPressedKeystamp) return;
 
-    // replace last digits from the available suggestion if possible
-    const selectedSuggestion = suggestions.length > 0 && suggestions[0];
+    this.setState(state => {
+      // replace last digits from the available suggestion if possible when T9 mode
+      const selectedSuggestion = suggestions.length > 0 && suggestions[0];
+      selectedSuggestion &&
+        state.mode === "T9" &&
+        (state.lastKeyObject || {}).action !== "delete" &&
+        this.append(selectedSuggestion, false, true);
 
-    selectedSuggestion && this.append(selectedSuggestion, false, true);
-
-    this.setState({
-      t9Keys: t9Keys,
-      suggestions: suggestions
+      return {
+        t9Keys: t9Keys,
+        suggestions: suggestions
+      };
     });
   };
 
@@ -111,21 +120,21 @@ class App extends React.Component {
   };
 
   // Handle keyboard input
-  onKey = (keyObject, keyboardMode, maj = false) => {
+  onKey = (keyObject, maj = false) => {
+    const { mode, text } = this.state;
+
     this.setState(state => {
       const isSameAsPreviousKey =
-        keyboardMode === "ABC" &&
         Date.now() - state.lastKeyTimestamp < 300 &&
         keyObject.alpha &&
         keyObject.alpha.indexOf(state.text.split("").pop()) >= 0;
 
       return {
         lastKeyTimestamp: Date.now(),
+        lastKeyObject: keyObject,
         sameKeyRepetition: isSameAsPreviousKey ? state.sameKeyRepetition + 1 : 0
       };
     });
-
-    const text = this.state.text;
 
     if (keyObject.action) {
       switch (keyObject.action) {
@@ -136,14 +145,20 @@ class App extends React.Component {
           this.setState({ text: text.slice(0, text.length - 1) });
           break;
         case "copy":
-          //this.state.text
-          //TODO: copy to clipboard and show a toast
+          copy(this.state.text.trim());
+          alert("Text copied to clipboard!");
+          break;
+        case "mode":
+          this.toggleMode();
+          break;
+        case "onlyEnglishWords":
+          this.toggleEng();
           break;
       }
       return;
     }
 
-    if (keyboardMode === "123") {
+    if (mode === "123") {
       this.append(keyObject.num >= 0 ? keyObject.num : keyObject.alpha);
       return;
     }
@@ -153,7 +168,7 @@ class App extends React.Component {
       return;
     }
 
-    if (keyboardMode === "ABC" || keyObject.num === 1) {
+    if (mode === "ABC" || keyObject.num === 1) {
       this.setState(state => {
         const character = keyObject.alpha[state.sameKeyRepetition];
 
@@ -162,7 +177,7 @@ class App extends React.Component {
 
         this.append(toInsert, state.sameKeyRepetition > 0);
       });
-    } else if (keyboardMode === "T9") {
+    } else if (mode === "T9") {
       this.append(keyObject.num);
     }
   };
@@ -170,6 +185,16 @@ class App extends React.Component {
   onSuggestionSelect = word => {
     this.append(word + " ", false, true);
   };
+
+  toggleMode = () => {
+    const modes = ["T9", "ABC", "123"];
+    const nextMode = modes[modes.indexOf(this.state.mode) + 1] || modes[0];
+    this.setState({ mode: nextMode });
+  };
+
+  toggleEng() {
+    this.setState(state => ({ onlyEnglishWords: !state.onlyEnglishWords }));
+  }
 
   render() {
     const suggestionWord = this.state.suggestions[0] || "";
@@ -183,7 +208,11 @@ class App extends React.Component {
             onSuggestionSelect={this.onSuggestionSelect}
           />
         </div>
-        <Keyboard onKey={this.onKey} />
+        <Keyboard
+          onKey={this.onKey}
+          mode={this.state.mode}
+          onlyEnglishWords={this.state.onlyEnglishWords}
+        />
       </div>
     );
   }
@@ -280,7 +309,7 @@ class Keyboard extends React.Component {
       key9: { id: "key9", offset: 11, num: 9, alpha: "wxyz" },
       mode: { id: "mode", offset: 12, action: "mode", circle: true },
       maj: { id: "maj", offset: 13, action: "maj", circle: true, alpha: "MAJ" },
-      key0: { id: "key0", offset: 14, num: 0, alpha: " ", icon: <Delete /> },
+      key0: { id: "key0", offset: 14, num: 0, alpha: " ", icon: <SpaceBar /> },
       delete: {
         id: "delete",
         offset: 15,
@@ -288,15 +317,13 @@ class Keyboard extends React.Component {
         circle: true,
         icon: <Delete />
       },
-      newLine: {
-        id: "newLine",
+      onlyEnglishWords: {
+        id: "onlyEnglishWords",
         offset: 16,
-        alpha: "\n",
-        circle: true,
-        icon: <CornerDownLeft />
+        action: "onlyEnglishWords",
+        circle: true
       }
     },
-    mode: "T9", // t9 / ABC / 123
     maj: true
   };
 
@@ -307,22 +334,13 @@ class Keyboard extends React.Component {
       case "maj":
         this.toggleMAJ();
         break;
-      case "mode":
-        this.toggleMode();
-        break;
       default:
-        this.props.onKey(keyObj, this.state.mode, this.state.maj);
+        this.props.onKey(keyObj, this.state.maj);
         if (this.state.maj) this.toggleMAJ();
 
         break;
     }
   };
-
-  toggleMode() {
-    const modes = ["T9", "ABC", "123"];
-    const nextMode = modes[modes.indexOf(this.state.mode) + 1] || modes[0];
-    this.setState({ mode: nextMode });
-  }
 
   toggleMAJ() {
     this.setState(state => ({ maj: !state.maj }));
@@ -352,9 +370,11 @@ class Keyboard extends React.Component {
                 uppercase={this.state.maj}
                 onClick={() => this.buttonClicked(key)}
               >
-                {(key === "mode" && this.state.mode) ||
+                {(key === "mode" && this.props.mode) ||
                   (key === "maj" && (this.state.maj ? "maj" : "MAJ")) ||
-                  (this.state.mode === "123" && num >= 0 && num + "") ||
+                  (key === "onlyEnglishWords" &&
+                    (this.props.onlyEnglishWords ? "ENG" : "ALL")) ||
+                  (this.props.mode === "123" && num >= 0 && num + "") ||
                   icon ||
                   alpha}
               </Button>
@@ -431,6 +451,12 @@ const Trash = ({ ...props }) => (
   <Icon {...props}>
     <polyline points="3 6 5 6 21 6" />
     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </Icon>
+);
+
+const SpaceBar = ({ ...props }) => (
+  <Icon {...props}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
   </Icon>
 );
 
