@@ -1,6 +1,6 @@
 # T9 keyboard with +275k english words dictionary
 
-A retro T9 keyboard. It uses a huge english dictionary to make writing easy!
+A retro T9 keyboard. Uses a huge english dictionary to make writing easy!
 
 # Features
 
