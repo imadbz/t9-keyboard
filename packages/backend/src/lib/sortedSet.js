@@ -78,6 +78,10 @@ SortedSet.prototype.map = function(fn, ctx) {
   return this.elements.map(fn, ctx);
 };
 
+SortedSet.prototype.filter = function(fn, ctx) {
+  return this.elements.filter(fn, ctx);
+};
+
 /**
  * Executes a provided function once per sorted set element.
  *

@@ -23,12 +23,16 @@ export default (req, res) => {
 
   const keysList = Object.keys(keys).map(key => keys[key]);
 
-  let possibleCombs = AllPossibleCombinations(keysList);
-  if (onlyEnglish) possibleCombs = OnlyEnglishWords(possibleCombs);
+  let possibleCombs = [];
 
-  console.log(req.body, keysList, possibleCombs);
+  if (onlyEnglish) possibleCombs = OnlyEnglishWords(keysList);
+  else possibleCombs = AllPossibleCombinations(keysList);
+
+  possibleCombs = possibleCombs
+    .sort((a, b) => a.length - b.length)
+    .slice(0, 10);
 
   res.json({
-    suggestions: possibleCombs
+    suggestions: possibleCombs.slice(0, 10)
   });
 };

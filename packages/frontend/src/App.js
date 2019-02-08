@@ -29,7 +29,9 @@ class App extends React.Component {
   };
 
   componentDidUpdate(prevProps, prevState) {
-    if (prevState.text !== this.state.text) this.suggest();
+    if (prevState.text !== this.state.text) {
+      this.suggest();
+    }
   }
 
   // call backend to suggest words
@@ -98,6 +100,7 @@ class App extends React.Component {
       selectedSuggestion &&
         state.mode === "T9" &&
         (state.lastKeyObject || {}).action !== "delete" &&
+        selectedSuggestion.length === lastWord.length &&
         this.append(selectedSuggestion, false, true);
 
       return {

@@ -6,8 +6,12 @@ sortedEnglish.add(english);
 
 // Filter a list of words, output only english ones
 export const OnlyEnglishWords = arr => {
-  const listOfWords = new SortedSet();
-  listOfWords.add(arr);
-
-  return sortedEnglish.intersect(listOfWords);
+  return arr.reduce((acc, letterComb, i) => {
+    const newList = letterComb.reduce((list, letter) => {
+      const wordsList = acc.filter(w => w.length >= i && w[i] === letter);
+      list.push(...wordsList);
+      return list;
+    }, []);
+    return newList;
+  }, english);
 };
